@@ -7,9 +7,14 @@ output: pdf_document
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
+if (!require(tidyverse)) install.packages("tidyverse")
+library(tidyverse)
+
+if (!require(caret)) install.packages("caret")
+library(caret)
 ```
 
-## Introduction
+## 1. Introduction
 
 The project is aimed at developing a predictive algorithm for liver disease using patient records from India, which are publicly available on Kaggle.com through the link "https://www.kaggle.com/datasets/uciml/indian-liver-patient-records"".
 
@@ -17,7 +22,7 @@ Liver disease is a significant health problem worldwide, and its early detection
 
 In this project, various machine learning will be applied and fine tuned to predict the likelihood of liver disease in patients.
 
-## Dataset Description
+## 2. Dataset Description
 This is extracted from Kaggle.The data set contains 416 liver patient records and 167 non liver patient records collected from North East of Andhra Pradesh, India. Any patient whose age exceeded 89 is listed as being of age "90".
 
 Columns:
@@ -35,17 +40,201 @@ Columns:
 11. Dataset: field used to split the data into two sets (patient with liver disease, or no disease)
 \newpage
 
-## Analysis
-First the csv file stored in "Raw-Dataset" subfolder is loaded in to a dataframe using following code.
-```{dataset load}
+## 3. Data Wrangling
+First, the csv file stored in "Raw-Dataset" subfolder is loaded in to a dataframe using following code.
+```{r}
 dat <- read.csv("./Raw-Dataset/indian_liver_patient.csv")
 
 ```
 
-It was observed that presence of liver disease is stated in the "Dataset" column of the Dataframe and the existence of liver disease is denoted by 1 and non-existence is denoted by 2. Since this notation is counter intuitive, "Dataset" Column is renamed to "Disease" and existence and non-existence of liver disease is denoted by 1 and 0 respectively. This is achieved by the following code chunk.
+It was observed that presence of liver disease is stated in the "Dataset" column of the Dataframe and the existence of liver disease is denoted by 1 and non-existence is denoted by 2. Since this notation is counter intuitive, "Dataset" Column is renamed to "Disease" and existence and non-existence of liver disease is denoted by 1 and 0 respectively. Apart from this, the "Gender" column of the Dataframe is a character vector with on "Male" and "Female" entries. This should also be converted to a factor vector. Both of these can be achieved by the following code chunk.
 
-```{dataset column change}
-dat <- dat %>% mutate(Disease = ifelse(Dataset==1,1,0)) %>% select(-Dataset)
+```{r}
+dat <- dat %>% mutate(Disease = ifelse(Dataset==1,1,0), Gender=as.factor(Gender)) %>% 
+  select(-Dataset)
 ```
 
 Now, the existence of liver disease is noted in "Disease" column intuitively using 1 and 0.
+
+By running the following code it was observed that there are missing values in the Dataframe and they are all in the "Albumin_and_Globulin_Ratio" column.
+```{r}
+sum(is.na(dat %>% select(-Gender)))
+colSums(is.na(dat %>% select(-Gender)))
+```
+Since there are 583 total observations, omission of the 4 rows with missing values was considered to have a negligible effect. The omission was carried out by the following code.
+```{r}
+dat <- na.omit(dat)
+```
+The Dataframe is now considered ready for further statistical analysis to find out which variable to use for prediction of liver disease. 
+
+## 4. Analysis
+
+First, we will analyse the gender influence in liver disease. The portion of people with liver disease for male and female genders can be extracted from the following code.
+```{r}
+mean((dat %>% filter(Gender=="Male"))$Disease==1)
+mean((dat %>% filter(Gender=="Female"))$Disease==1)
+```
+It was observed, that according to the sample in the dataset both genders have more than 50% chance of having liver disease, which might not be case for the populations. However, gender male has higher likelyhood for liver disease, which suggests that the column gender may play an important part in liver disease prediction.
+
+### 4.1 Checking for Outliers and Visible Patterns of Indivugual Numerical Variables
+Each variable is plotted individually to identify any outliers. 
+```{r fig.height = 2, fig.width = 6}
+dat %>% ggplot(aes(x = seq(1,nrow(dat),1), y = Total_Bilirubin)) +
+  geom_point(aes(col=as.factor(Disease)), alpha = 0.5, size = 0.7) +
+  guides(color = guide_legend(title = "Disease")) +
+  xlab("Index")
+```
+
+Although the plot of "Total Bilirubin" appears to have one element with very high value, it is not extreme enough to be considered an outlier.
+
+```{r fig.height = 2, fig.width = 6}
+dat %>% ggplot(aes(x = seq(1,nrow(dat),1), y = Direct_Bilirubin)) +
+  geom_point(aes(col=as.factor(Disease)), alpha = 0.5, size = 0.7) +
+  guides(color = guide_legend(title = "Disease")) +
+  xlab("Index")
+```
+\newpage
+```{r fig.height = 2, fig.width = 6}
+dat %>% ggplot(aes(x = seq(1,nrow(dat),1), y = Alkaline_Phosphotase)) +
+  geom_point(aes(col=as.factor(Disease)), alpha = 0.5, size = 0.7) +
+  guides(color = guide_legend(title = "Disease")) +
+  xlab("Index")
+```
+```{r fig.height = 2, fig.width = 6}
+dat %>% ggplot(aes(x = seq(1,nrow(dat),1), y = Alamine_Aminotransferase)) +
+  geom_point(aes(col=as.factor(Disease)), alpha = 0.5, size = 0.7) +
+  guides(color = guide_legend(title = "Disease")) +
+  xlab("Index")
+```
+```{r fig.height = 2, fig.width = 6}
+dat %>% ggplot(aes(x = seq(1,nrow(dat),1), y = Aspartate_Aminotransferase)) +
+  geom_point(aes(col=as.factor(Disease)), alpha = 0.5, size = 0.7) +
+  guides(color = guide_legend(title = "Disease")) +
+  xlab("Index")
+```
+\newpage
+```{r fig.height = 2, fig.width = 6}
+dat %>% ggplot(aes(x = seq(1,nrow(dat),1), y = Total_Protiens)) +
+  geom_point(aes(col=as.factor(Disease)), alpha = 0.5) +
+  guides(color = guide_legend(title = "Disease")) +
+  xlab("Index")
+```
+```{r fig.height = 2, fig.width = 6}
+dat %>% ggplot(aes(x = seq(1,nrow(dat),1), y = Albumin)) +
+  geom_point(aes(col=as.factor(Disease)), alpha = 0.5) +
+  guides(color = guide_legend(title = "Disease")) +
+  xlab("Index")
+```
+```{r fig.height = 2, fig.width = 6}
+dat %>% ggplot(aes(x = seq(1,nrow(dat),1), y = Albumin_and_Globulin_Ratio)) +
+  geom_point(aes(col=as.factor(Disease)), alpha = 0.5) +
+  guides(color = guide_legend(title = "Disease")) +
+  xlab("Index")
+```
+
+Individual plots do not give away clues of visible patterns of individual variables. However, from the above plots it can be observed that following variables have large range, but have more points close to zero than away from zero. 
+```{r}
+Range_Total_Bilirubin <- range(dat$Total_Bilirubin)
+Range_Total_Bilirubin
+
+Range_Direct_Bilirubin <- range(dat$Direct_Bilirubin)
+Range_Direct_Bilirubin
+
+Range_Alkaline_Phosphotase <- range(dat$Alkaline_Phosphotase)
+Range_Alkaline_Phosphotase
+
+Range_Alamine_Aminotransferase <- range(dat$Alamine_Aminotransferase)
+Range_Alamine_Aminotransferase
+
+Range_Aspartate_Aminotransferase <- range(dat$Aspartate_Aminotransferase)
+Range_Aspartate_Aminotransferase
+```
+
+This suggests that log transformations applied to each of the following variables may improve the performance of a prediction algorithm. Log transformations are applied using the following code. The new Dataframe with log transformations is named data_log.
+```{r}
+dat_log <- dat %>% 
+  mutate(Total_Bilirubin_log = log2(Total_Bilirubin),
+         Direct_Bilirubin_log = log2(Direct_Bilirubin),
+         Alkaline_Phosphotase_log = log10(Alkaline_Phosphotase),
+         Alamine_Aminotransferase_log = log10(Alamine_Aminotransferase),
+         Aspartate_Aminotransferase_log = log10(Aspartate_Aminotransferase)) %>%
+  select(-Total_Bilirubin, -Direct_Bilirubin, -Alkaline_Phosphotase, 
+         -Alamine_Aminotransferase, -Aspartate_Aminotransferase)
+```
+\newpage
+The following histograms show a comparison of histograms for each high range variable before applying log transformation and after, respectively.
+
+Total Bilirubin:
+
+```{r fig.height = 1.5, fig.width = 6,echo=FALSE}
+dat %>% ggplot(aes(x = Total_Bilirubin)) + geom_histogram(bins = 30)
+```
+```{r fig.height = 1.5, fig.width = 6,echo=FALSE}
+dat_log %>% ggplot(aes(x = Total_Bilirubin_log)) + geom_histogram(bins = 30)
+```
+
+Direct Bilirubin:
+
+```{r fig.height = 1.5, fig.width = 6,echo=FALSE}
+dat %>% ggplot(aes(x = Direct_Bilirubin)) + geom_histogram(bins = 30)
+```
+```{r fig.height = 1.5, fig.width = 6,echo=FALSE}
+dat_log %>% ggplot(aes(x = Direct_Bilirubin_log)) + geom_histogram(bins = 30)
+```
+\newpage
+Alkaline Phosphotase:
+
+```{r fig.height = 1.5, fig.width = 6,echo=FALSE}
+dat %>% ggplot(aes(x = Alkaline_Phosphotase)) + geom_histogram(bins = 30)
+```
+```{r fig.height = 1.5, fig.width = 6,echo=FALSE}
+dat_log %>% ggplot(aes(x = Alkaline_Phosphotase_log)) + geom_histogram(bins = 30)
+```
+
+Alamine Aminotransferase:
+
+```{r fig.height = 1.5, fig.width = 6,echo=FALSE}
+dat %>% ggplot(aes(x = Alamine_Aminotransferase)) + geom_histogram(bins = 30)
+```
+```{r fig.height = 1.5, fig.width = 6,echo=FALSE}
+dat_log %>% ggplot(aes(x = Alamine_Aminotransferase_log)) + geom_histogram(bins = 30)
+```
+\newpage
+Aspartate Aminotransferase:
+
+```{r fig.height = 1.5, fig.width = 6,echo=FALSE}
+dat %>% ggplot(aes(x = Aspartate_Aminotransferase)) + geom_histogram(bins = 30)
+```
+```{r fig.height = 1.5, fig.width = 6,echo=FALSE}
+dat_log %>% ggplot(aes(x = Aspartate_Aminotransferase_log)) + geom_histogram(bins = 30)
+```
+
+### 4.2 Correlation Between Numerical Variables
+
+The correlation matrix for the numerical variables can be obtained using cor() function. However, the variable names are too long an effective presentation. Therefore, a temporary Dataframe called dat_for_corr is created with name abbreviations. 
+```{r }
+dat_log_for_corr <- dat_log %>% select(-Age,-Gender,-Disease)
+colnames(dat_log_for_corr) <- 
+  c("Tot Pr","Alb", "Alb Glb", "Tot Bil", "Dir Bil", "ALP", "ALA", "ASA")
+cr <- round(cor(dat_log_for_corr),4)
+cr
+```
+It can be observed from the correlation matrix that following pairs of variables have correlations close to 1.
+
+1. Total_Bilirubin - Direct_Bilirubin = 0.9657
+2. Alamine Aminotransferase - Aspartate Aminotransferase = 0.8416
+3. Total Protiens - Albumin = 0.7831
+4. Albumin - Albumin and Globulin Ratio = 0.6896
+
+This means that it may be possible to remove one variable from each pair without sacrificing much performance from the prediction algorithm.
+
+### 4.3 Applying Machine Learning
+
+We intends to apply kNN, Decision-Tree, Random-Forest and fine tune their parameters using cross-validation. We will compare the performance of each method and select the best one for the prediction of liver disease. For this purpose we first partition the Dataset in to training-set 60% and test-set 40% using the following code.
+```{r }
+set.seed(1)
+test_index <- createDataPartition(dat_log$Disease, times=1, p=0.4, list=FALSE)
+test_set <- dat_log[test_index,]
+train_set <- dat_log[-test_index,]
+```
+
