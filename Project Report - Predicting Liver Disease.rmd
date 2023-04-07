@@ -33,12 +33,19 @@ Columns:
 9. Albumin
 10. Albumin and Globulin Ratio
 11. Dataset: field used to split the data into two sets (patient with liver disease, or no disease)
+\newpage
 
+## Analysis
+First the csv file stored in "Raw-Dataset" subfolder is loaded in to a dataframe using following code.
+```{dataset load}
+dat <- read.csv("./Raw-Dataset/indian_liver_patient.csv")
 
-You can also embed plots, for example:
-
-```{r pressure, echo=FALSE}
-plot(pressure)
 ```
 
-Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.
+It was observed that presence of liver disease is stated in the "Dataset" column of the Dataframe and the existence of liver disease is denoted by 1 and non-existence is denoted by 2. Since this notation is counter intuitive, "Dataset" Column is renamed to "Disease" and existence and non-existence of liver disease is denoted by 1 and 0 respectively. This is achieved by the following code chunk.
+
+```{dataset column change}
+dat <- dat %>% mutate(Disease = ifelse(Dataset==1,1,0)) %>% select(-Dataset)
+```
+
+Now, the existence of liver disease is noted in "Disease" column intuitively using 1 and 0.
