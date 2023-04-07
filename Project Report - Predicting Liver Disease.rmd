@@ -17,11 +17,23 @@ Liver disease is a significant health problem worldwide, and its early detection
 
 In this project, various machine learning will be applied and fine tuned to predict the likelihood of liver disease in patients.
 
-```{r cars}
-summary(cars)
-```
+## Dataset Description
+This is extracted from Kaggle.The data set contains 416 liver patient records and 167 non liver patient records collected from North East of Andhra Pradesh, India. Any patient whose age exceeded 89 is listed as being of age "90".
 
-## Including Plots
+Columns:
+
+1. Age of the patient
+2. Gender of the patient
+3. Total Bilirubin
+4. Direct Bilirubin
+5. Alkaline Phosphotase
+6. Alamine Aminotransferase
+7. Aspartate Aminotransferase
+8. Total Protiens
+9. Albumin
+10. Albumin and Globulin Ratio
+11. Dataset: field used to split the data into two sets (patient with liver disease, or no disease)
+
 
 You can also embed plots, for example:
 
