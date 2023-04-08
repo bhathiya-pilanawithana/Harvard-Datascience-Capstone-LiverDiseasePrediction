@@ -8,7 +8,7 @@ library(tidyverse)
 if (!require(caret)) install.packages("caret")
 library(caret)
 
-if (!require(kernlab)) install.packages("kernlab")
+if (!require(kernlab)) install.packages("kernlab") #for svmRadial Model
 library(kernlab)
 #-end-[Load packages and install if required]
 
@@ -16,9 +16,9 @@ library(kernlab)
 dat <- read.csv("./Raw-Dataset/indian_liver_patient.csv")
 #-end-[Load the .csv file in 'Raw-Dataset' folder to a Dataframe]
 
-#-----[Rename to "Dataset" and change notation of disease existence]
+#-----[Rename "Dataset" column and change notation of disease existence]
 dat <- dat %>% mutate(Disease = as.factor(ifelse(Dataset==1,1,0)), Gender=as.factor(Gender)) %>% select(-Dataset)
-#-end-[Rename to "Dataset" and change notation of disease existence]
+#-end-[Rename "Dataset" column and change notation of disease existence]
 
 #-----[Check for missing values]
 sum(is.na(dat %>% select(-Gender)))
@@ -91,7 +91,7 @@ dat_log <- dat %>%
 
 #-----[Correlation Matrix]
 dat_log_for_corr <- dat_log %>% select(-Age,-Gender,-Disease)
-colnames(dat_log_for_corr) <- 
+colnames(dat_log_for_corr) <-             #Change column names to abbrivations
   c("Tot Pr","Alb", "Alb Glb", "Tot Bil", "Dir Bil", "ALP", "ALA", "ASA")
 cr <- round(cor(dat_log_for_corr),4)
 cr
@@ -101,24 +101,6 @@ cr
   #  Total Protiens - Albumin = 0.7831
   #  Albumin - Albumin and Globulin Ratio = 0.6896
 #-end-[Correlation Matrix]
-
-#-----[Plot highly correlated variables]
-dat_log %>% ggplot(aes(x = Total_Bilirubin_log, y = Direct_Bilirubin_log)) +
-  geom_point(aes(col = as.factor(Disease)), alpha = 0.3) +
-  guides(color = guide_legend(title = "Disease"))
-
-dat_log %>% ggplot(aes(x = Alamine_Aminotransferase_log, y = Aspartate_Aminotransferase_log)) +
-  geom_point(aes(col = as.factor(Disease)), alpha = 0.3) +
-  guides(color = guide_legend(title = "Disease"))
-
-dat_log %>% ggplot(aes(x = Total_Protiens, y = Albumin)) +
-  geom_point(aes(col = as.factor(Disease)), alpha = 0.3) +
-  guides(color = guide_legend(title = "Disease"))
-
-dat_log %>% ggplot(aes(x = Albumin, y = Albumin_and_Globulin_Ratio)) +
-  geom_point(aes(col = as.factor(Disease)), alpha = 0.3) +
-  guides(color = guide_legend(title = "Disease"))
-#-end-[Plot highly correlated variables]'
 
 #-----[Create test and training sets]
 set.seed(1)
