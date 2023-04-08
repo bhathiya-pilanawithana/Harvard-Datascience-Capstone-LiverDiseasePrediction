@@ -12,6 +12,9 @@ library(tidyverse)
 
 if (!require(caret)) install.packages("caret")
 library(caret)
+
+if (!require(kernlab)) install.packages("kernlab")
+library(kernlab)
 ```
 
 ## 1. Introduction
@@ -50,7 +53,8 @@ dat <- read.csv("./Raw-Dataset/indian_liver_patient.csv")
 It was observed that presence of liver disease is stated in the "Dataset" column of the Dataframe and the existence of liver disease is denoted by 1 and non-existence is denoted by 2. Since this notation is counter intuitive, "Dataset" Column is renamed to "Disease" and existence and non-existence of liver disease is denoted by 1 and 0 respectively. Apart from this, the "Gender" column of the Dataframe is a character vector with on "Male" and "Female" entries. This should also be converted to a factor vector. Both of these can be achieved by the following code chunk.
 
 ```{r}
-dat <- dat %>% mutate(Disease = ifelse(Dataset==1,1,0), Gender=as.factor(Gender)) %>% 
+dat <- dat %>% 
+  mutate(Disease = as.factor(ifelse(Dataset==1,1,0)), Gender=as.factor(Gender)) %>% 
   select(-Dataset)
 ```
 
@@ -68,6 +72,8 @@ dat <- na.omit(dat)
 The Dataframe is now considered ready for further statistical analysis to find out which variable to use for prediction of liver disease. 
 
 ## 4. Analysis
+
+We start with analyzing individual variables to find out any apparent patterns, variable ranges suggestive of log transformations. Next, correlations between variables are calculated, which may be suggestive of linear relationships among variables. The data is then preprocessed using identified patterns, transformations and to eliminate dependent variables. Cross validation then is used for model selection and hyper parameter tuning. 
 
 First, we will analyse the gender influence in liver disease. The portion of people with liver disease for male and female genders can be extracted from the following code.
 ```{r}
@@ -219,18 +225,17 @@ colnames(dat_log_for_corr) <-
 cr <- round(cor(dat_log_for_corr),4)
 cr
 ```
-It can be observed from the correlation matrix that following pairs of variables have correlations close to 1.
+It can be observed from the correlation matrix that several variables may have linear relationship between them. For example following groups of variables have correlations larger than 0.5 between each other.
 
-1. Total_Bilirubin - Direct_Bilirubin = 0.9657
-2. Alamine Aminotransferase - Aspartate Aminotransferase = 0.8416
-3. Total Protiens - Albumin = 0.7831
-4. Albumin - Albumin and Globulin Ratio = 0.6896
+1. Total Protiens - Albumin - Albumin_and_Globulin_Ratio 
+2. Alamine Aminotransferase - Aspartate Aminotransferase - Total Bilirubin - Direct Bilirubin 
 
-This means that it may be possible to remove one variable from each pair without sacrificing much performance from the prediction algorithm.
+These relationships may be exploited using Principal Component Analysis (PCA) while applying machine learning methods.
+\newpage
 
 ### 4.3 Applying Machine Learning
 
-We intends to apply kNN, Decision-Tree, Random-Forest and fine tune their parameters using cross-validation. We will compare the performance of each method and select the best one for the prediction of liver disease. For this purpose we first partition the Dataset in to training-set 60% and test-set 40% using the following code.
+To apply machine learning we first partition the Dataset in to training-set 60% and test-set 40% using the following code.
 ```{r }
 set.seed(1)
 test_index <- createDataPartition(dat_log$Disease, times=1, p=0.4, list=FALSE)
@@ -238,3 +243,136 @@ test_set <- dat_log[test_index,]
 train_set <- dat_log[-test_index,]
 ```
 
+#### 4.3.1 Preprocessing and Variable Transformation
+
+We first preprocess the training set and test using a PCA trained on training set. The number of PCA components are selected to be 8 since there are 9 numerical variables in total. This values will later be fine tuned once a suitable machine learning method is developed. Preprocessing based on PCA can be achieved using the following code.
+```{r }
+preProc <- preProcess(train_set, method = c("pca"), pcaComp = 8)
+train_set_transformed <- predict(preProc, train_set)
+test_set_transformed <- predict(preProc, test_set)
+```
+
+The above code omits the non-numerical columns in the training and test sets.
+
+#### 4.3.2 Model Selection
+
+We intends to apply kNN, Decision-Tree, Random-Forest and SVM with Radial Kernal and fine tune their parameters using cross-validation. We will compare the validation accuracy of each fine-tuned model and select the best one for the prediction of liver disease. 
+
+1. K-Nearest-Neighbor
+
+The following code is used for cross-validation of kNN for k.
+```{r }
+set.seed(2)
+k <- seq(2,100,2)
+fit_knn <- train(Disease ~ ., 
+                 data = train_set_transformed, 
+                 method = "knn", 
+                 tuneGrid = data.frame(k))
+knn_validation_acc <- max(fit_knn$results$Accuracy) #Holds kNN Validation Accuracy
+```
+
+2. Decision-Tree
+
+The following code is used for cross-validation of Decision-Tree for its cp parameter.
+```{r }
+set.seed(3)
+cp <- seq(0, 0.2, 0.004)
+fit_rpart <- train(Disease ~ ., 
+                     data=train_set_transformed, 
+                     method = "rpart",
+                     tuneGrid = data.frame(cp = cp))
+rpart_validation_acc <- max(fit_rpart$results$Accuracy) #Holds Decision-Tree Validation Accuracy
+```
+
+3. Random-Forest
+
+Caret package cross-validation for Random-Forest does not automatically include ntree and nodesize. Therefore, ntree and nodesize parameters are fine-tuned manually using the following code.
+```{r }
+set.seed(4)
+ntree <- seq(100, 130, 5) #Hold vector for ntree
+nodesize <- c(1,2,3) #Hold Vector for nodesize
+exgrd <- expand.grid(ntree,nodesize) #Vector with all combinations of ntree and nodesize
+vec <- seq(1,nrow(exgrd)) #Index vector to sweep through exgrd vector using sapply
+acc <- sapply(vec, function(n){
+  train(Disease ~., 
+        data = train_set_transformed,
+        method = "rf", 
+        tuneGrid = data.frame(mtry = 1), 
+        ntree = exgrd$Var1[n],
+        nodesize = exgrd$Var2[n])$results$Accuracy
+})
+opt_mtry <- 1
+opt_ntree <- exgrd$Var1[which.max(acc)] #Holds optimal ntree value
+opt_nodesize <- exgrd$Var2[which.max(acc)] #Holds optimal nodesize value
+
+#The following code build a Random-Forest predictor with optimal ntree and nodesize
+set.seed(4)
+fit_rf <- train(Disease ~., 
+                data = train_set_transformed,
+                method = "rf", 
+                tuneGrid = data.frame(mtry = opt_mtry), 
+                ntree = opt_ntree,
+                nodesize = opt_nodesize)
+rf_validation_acc <- max(fit_rf$results$Accuracy) #Holds Random-Forest Validation Accuracy
+```
+
+4. SVM with Radial Kernal
+
+The following code is used for cross-validation of SVM with Radial Kernal for its sigma and C parameters.
+```{r }
+set.seed(5)
+C <- seq(0.1, 2, 20)
+sigma <- seq(0.1, 2, 20)
+fit_svmRadial <- train(Disease ~.,
+                  data = train_set_transformed,
+                  method = "svmRadial", 
+                  tuneGrid = data.frame(C = C, sigma = sigma))
+svmRadial_validation_acc <- max(fit_svmRadial$results$Accuracy) #Holds Svm-Radial Validation Accuracy
+```
+
+The following code prints the obtained validation accuracies for each fine-tuned model.
+```{r }
+knn_validation_acc
+rpart_validation_acc 
+rf_validation_acc
+svmRadial_validation_acc
+```
+\newpage
+
+## 5. Results
+
+It can be observed from the above validation accuracies that Random-Forest with following parameters gives the maximum validation accuracy. 
+```{r }
+opt_mtry
+opt_ntree
+opt_nodesize 
+```
+
+We can now change the number of PCA components used during preprocessing and check whether there is a significant change in the validation accuracy. It was observed that pcaComp=7 gives a lower accuracy than pcaComp=8 and pcaComp=9 does not make a significant change. Therefore, pcaComp=8 is kept unchanged.
+
+We use the Random-Forest model built together with PCA based preprocessing with 8 components for testing and final results.
+
+The following code can be used to obtain and print accuracy, sensitivity, specificity, F1-score and other related metrices. 
+```{r }
+Disease_hat_rf_test <- predict(fit_rf, test_set_transformed)
+cm <- confusionMatrix(Disease_hat_rf_test, test_set_transformed$Disease, positive = "1")
+cm[["overall"]][["Accuracy"]]
+cm[["byClass"]][["Sensitivity"]]
+cm[["byClass"]][["Specificity"]]
+cm[["byClass"]][["F1"]]
+cm[["byClass"]][["Pos Pred Value"]]
+cm[["byClass"]][["Neg Pred Value"]]
+```
+
+It can be observed that the prediction results in a high sensitivity but with a low specificity. This may be due to the Dataset imbalance. The Dataset consists of significantly more number of cases with liver disease than cases without liver disease. Therefore, the prediction algorithm is inherently biased towards positive cases, which results in higher sensitivity and a lower specificity.
+
+The values "Pos Pred Value" and "Neg Pred Value" gives the probability of liver desease when the prediction is positive and the probability of no liver disease when the prediction is negative, respectively. Out of these probabilities "Neg Pred Value" is more important for this case due to medical reasons. It can be observed from the above values that "Neg Pred Value" (Probability of no liver disease when prediction is negative) is larger than 0.5, which suggests that the prediction algorithm works better than simple guess work.
+Since, the prediction of liver disease should be supportive for medical decisions, 
+
+## 6. Conclusion
+
+It was observed that a Random-Forest Predictor provides the best accuracy. However, the significant Dataset imbalance limits the algorithms performance. A Dataset, with more observations for the cases of no liver disease may increase the performance of prediction algorithm. However, the prediction algorithm developed using the current Dataset provides higher accuracy than guess work.
+
+## 7. References
+
+The Dataset was obtained from Kaggle.com which can be downloaded from "https://www.kaggle.com/datasets/uciml/indian-liver-patient-records" (accessed on 08/04/2013).
