@@ -115,13 +115,18 @@ train_set_transformed <- predict(preProc, train_set)
 test_set_transformed <- predict(preProc, test_set)
 #-end-[Preprocessing and variable transformation using PCA]
 
+#-----[Cross-validation parameters for model selection]
+control <- trainControl(method = "cv", number = 8, p = .8)
+#-end-[Cross-validation parameters for model selection]
+
 #-----[kNN parameter optimization using cross-validation]
 set.seed(2)
 k <- seq(2,100,2)
 fit_knn <- train(Disease ~ ., 
                  data = train_set_transformed, 
                  method = "knn", 
-                 tuneGrid = data.frame(k))
+                 tuneGrid = data.frame(k),
+                 trControl = control)
 knn_validation_acc <- max(fit_knn$results$Accuracy) #Holds kNN Validation Accuracy
 #-end-[kNN parameter optimization using cross-validation]
 
@@ -131,7 +136,8 @@ cp <- seq(0, 0.2, 0.004)
 fit_rpart <- train(Disease ~ ., 
                      data=train_set_transformed, 
                      method = "rpart",
-                     tuneGrid = data.frame(cp = cp))
+                     tuneGrid = data.frame(cp = cp),
+                     trControl = control)
 rpart_validation_acc <- max(fit_rpart$results$Accuracy) #Holds Decision-Tree Validation Accuracy
 #-end-[Decision-Tree parameter optimization using cross-validation]
 
@@ -142,17 +148,18 @@ rpart_validation_acc <- max(fit_rpart$results$Accuracy) #Holds Decision-Tree Val
 #using the following code
 
 set.seed(4)
-ntree <- seq(100, 130, 5) #Hold vector for ntree
-nodesize <- c(1,2,3) #Hold Vector for nodesize
+ntree <- seq(100, 130, 5) #Vector for ntree
+nodesize <- c(1,2,3) #Vector for nodesize
 exgrd <- expand.grid(ntree,nodesize) #Create a vector with all combinations of ntree and nodesize
-vec <- seq(1,nrow(exgrd)) #Hold an index vector to sweep through ex vector using following sapply
-acc <- sapply(vec, function(n){
+ind_vec <- seq(1,nrow(exgrd)) #Holds an index vector to sweep through exgrd vector using following sapply
+acc <- sapply(ind_vec, function(n){
   train(Disease ~., 
         data = train_set_transformed,
         method = "rf", 
         tuneGrid = data.frame(mtry = 1), 
         ntree = exgrd$Var1[n],
-        nodesize = exgrd$Var2[n])$results$Accuracy
+        nodesize = exgrd$Var2[n],
+        trControl = control)$results$Accuracy
 })
 opt_mtry <- 1
 opt_ntree <- exgrd$Var1[which.max(acc)] #Hold optimal ntree value that maximizes the validation accuracy
@@ -165,7 +172,8 @@ fit_rf <- train(Disease ~.,
                 method = "rf", 
                 tuneGrid = data.frame(mtry = opt_mtry), 
                 ntree = opt_ntree,
-                nodesize = opt_nodesize)
+                nodesize = opt_nodesize,
+                trControl = control)
 rf_validation_acc <- max(fit_rf$results$Accuracy) #Holds Random-Forest Validation Accuracy
 #-end-[Random-Forest parameter optimization using cross-validation]
 
@@ -176,7 +184,8 @@ sigma <- seq(0.1, 2, 20)
 fit_svmRadial <- train(Disease ~.,
                   data = train_set_transformed,
                   method = "svmRadial", 
-                  tuneGrid = data.frame(C = C, sigma = sigma))
+                  tuneGrid = data.frame(C = C, sigma = sigma),
+                  trControl = control)
 svmRadial_validation_acc <- max(fit_svmRadial$results$Accuracy) #Holds Svm-Radial Validation Accuracy
 #-end-[SVM-Radial optimization using cross-validation]
 

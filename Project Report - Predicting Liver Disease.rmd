@@ -23,7 +23,9 @@ The project is aimed at developing a predictive algorithm for liver disease usin
 
 Liver disease is a significant health problem worldwide, and its early detection is crucial because it allows for prompt treatment, which can prevent the progression of the disease and potentially save lives. The liver is a vital organ that performs numerous functions in the body, such as filtering toxins from the blood, producing bile, and metabolizing drugs. Liver disease can develop over time and may not present any symptoms until it has progressed to an advanced stage. Early detection can help identify the disease before symptoms become severe and irreversible damage has occurred. Furthermore, some types of liver disease, such as viral hepatitis, can be highly contagious, making early detection even more important in preventing the spread of the disease to others. Additionally, early detection of liver disease can enable healthcare professionals to closely monitor and manage the condition, which can help reduce the risk of complications and improve overall health outcomes. This may involve lifestyle changes, medication, and in some cases, surgery or liver transplantation.
 
-In this project, various machine learning will be applied and fine tuned to predict the likelihood of liver disease in patients.
+In this project, various machine learning will be applied and fine tuned to predict the likelihood of liver disease in patients. 
+
+Steps taken to generate results and conclusions are as follows; Dataset is first loaded from an .csv file stored in a subdirectory of the project. The selected dataset is machine learning friendly and only some basic data-wrngling methods are needed to handle missing values in the dataset and to convert character variables to factors for classification. Then individual variables are analysed using data visualization techniques to find out any apparent patterns and also to check whether variable transformations are necessary. Correlation between each pair of variables are calculated to find out linear relationships between variables. Dataset is then preprocessed using the insights gained during the individual and variable correlation analysis. Then several machine learning models (kNN, Decision-Tree, Random-Forest, svmRadial) are trained with cross validation for hyer-parameter tuning and the best model is selected for prediction to generate final results and conclusions.
 
 ## 2. Dataset Description
 This is extracted from Kaggle.The data set contains 416 liver patient records and 167 non liver patient records collected from North East of Andhra Pradesh, India. Any patient whose age exceeded 89 is listed as being of age "90".
@@ -41,7 +43,8 @@ Columns:
 9. Albumin
 10. Albumin and Globulin Ratio
 11. Dataset: field used to split the data into two sets (patient with liver disease, or no disease)
-\newpage
+
+The goal is to used variables from 1 to 10 to detect liver disease stated in the "Dataset" column of the dataset.
 
 ## 3. Data Wrangling
 First, the csv file stored in "Raw-Dataset" subfolder is loaded in to a dataframe using following code.
@@ -70,6 +73,7 @@ Since there are 583 total observations, omission of the 4 rows with missing valu
 dat <- na.omit(dat)
 ```
 The Dataframe is now considered ready for further statistical analysis to find out which variable to use for prediction of liver disease. 
+\newpage
 
 ## 4. Analysis
 
@@ -92,6 +96,7 @@ dat %>% ggplot(aes(x = seq(1,nrow(dat),1), y = Total_Bilirubin)) +
 ```
 
 Although the plot of "Total Bilirubin" appears to have one element with very high value, it is not extreme enough to be considered an outlier.
+\newpage
 
 ```{r fig.height = 2, fig.width = 6}
 dat %>% ggplot(aes(x = seq(1,nrow(dat),1), y = Direct_Bilirubin)) +
@@ -99,7 +104,6 @@ dat %>% ggplot(aes(x = seq(1,nrow(dat),1), y = Direct_Bilirubin)) +
   guides(color = guide_legend(title = "Disease")) +
   xlab("Index")
 ```
-\newpage
 ```{r fig.height = 2, fig.width = 6}
 dat %>% ggplot(aes(x = seq(1,nrow(dat),1), y = Alkaline_Phosphotase)) +
   geom_point(aes(col=as.factor(Disease)), alpha = 0.5, size = 0.7) +
@@ -112,13 +116,13 @@ dat %>% ggplot(aes(x = seq(1,nrow(dat),1), y = Alamine_Aminotransferase)) +
   guides(color = guide_legend(title = "Disease")) +
   xlab("Index")
 ```
+\newpage
 ```{r fig.height = 2, fig.width = 6}
 dat %>% ggplot(aes(x = seq(1,nrow(dat),1), y = Aspartate_Aminotransferase)) +
   geom_point(aes(col=as.factor(Disease)), alpha = 0.5, size = 0.7) +
   guides(color = guide_legend(title = "Disease")) +
   xlab("Index")
 ```
-\newpage
 ```{r fig.height = 2, fig.width = 6}
 dat %>% ggplot(aes(x = seq(1,nrow(dat),1), y = Total_Protiens)) +
   geom_point(aes(col=as.factor(Disease)), alpha = 0.5) +
@@ -131,6 +135,7 @@ dat %>% ggplot(aes(x = seq(1,nrow(dat),1), y = Albumin)) +
   guides(color = guide_legend(title = "Disease")) +
   xlab("Index")
 ```
+\newpage
 ```{r fig.height = 2, fig.width = 6}
 dat %>% ggplot(aes(x = seq(1,nrow(dat),1), y = Albumin_and_Globulin_Ratio)) +
   geom_point(aes(col=as.factor(Disease)), alpha = 0.5) +
@@ -235,13 +240,21 @@ These relationships may be exploited using Principal Component Analysis (PCA) wh
 
 ### 4.3 Applying Machine Learning
 
-To apply machine learning we first partition the Dataset in to training-set 60% and test-set 40% using the following code.
+To apply machine learning we first partition the Dataset in to training-set 60% and test-set 40% using the following code. 
 ```{r }
 set.seed(1)
 test_index <- createDataPartition(dat_log$Disease, times=1, p=0.4, list=FALSE)
 test_set <- dat_log[test_index,]
 train_set <- dat_log[-test_index,]
 ```
+
+The number of observations in train_set and test_set are as follows.
+```{r }
+nrow(train_set)
+nrow(test_set)
+```
+
+Thus, it is noted that the selected partition with 60%-40%, gives sufficient number of observations for both train_set and test_set.
 
 #### 4.3.1 Preprocessing and Variable Transformation
 
@@ -256,50 +269,61 @@ The above code omits the non-numerical columns in the training and test sets.
 
 #### 4.3.2 Model Selection
 
-We intends to apply kNN, Decision-Tree, Random-Forest and SVM with Radial Kernal and fine tune their parameters using cross-validation. We will compare the validation accuracy of each fine-tuned model and select the best one for the prediction of liver disease. 
+We intends to apply kNN, Decision-Tree, Random-Forest and SVM with Radial Kernal and fine tune their parameters using cross-validation. These models we used since the dataset appears to have non-linear boundaries for classification.  We will compare the validation accuracy of each fine-tuned model and select the best one for the prediction of liver disease. 
+
+The following code sets the cross-validation parameters used for this purpose.
+```{r }
+control <- trainControl(method = "cv", number = 8, p = .8)
+```
+
+We use 8-fold cross validation with 20% observations for validation. These parameters were used to lower the computational burden of training for the graders of the project.
 
 1. K-Nearest-Neighbor
 
-The following code is used for cross-validation of kNN for k.
+The kNN classifier is select as an option due to the fact that the dataset is relatively small. The following code is used for cross-validation of kNN for k.
 ```{r }
 set.seed(2)
 k <- seq(2,100,2)
 fit_knn <- train(Disease ~ ., 
                  data = train_set_transformed, 
                  method = "knn", 
-                 tuneGrid = data.frame(k))
+                 tuneGrid = data.frame(k),
+                 trControl = control)
 knn_validation_acc <- max(fit_knn$results$Accuracy) #Holds kNN Validation Accuracy
 ```
+\newpage
 
 2. Decision-Tree
 
-The following code is used for cross-validation of Decision-Tree for its cp parameter.
+The decision-tree classifrer is used due to its ability to generate an interpretable result, which can be extremely useful in the case of medical setting of liver disease prediction. The following code is used for cross-validation of Decision-Tree for its cp parameter.
 ```{r }
 set.seed(3)
 cp <- seq(0, 0.2, 0.004)
 fit_rpart <- train(Disease ~ ., 
                      data=train_set_transformed, 
                      method = "rpart",
-                     tuneGrid = data.frame(cp = cp))
+                     tuneGrid = data.frame(cp = cp),
+                     trControl = control)
 rpart_validation_acc <- max(fit_rpart$results$Accuracy) #Holds Decision-Tree Validation Accuracy
 ```
 
 3. Random-Forest
 
-Caret package cross-validation for Random-Forest does not automatically include ntree and nodesize. Therefore, ntree and nodesize parameters are fine-tuned manually using the following code.
+The random-forest predictor works by averaging over many decision-trees to improve the prediction accuracy. Caret package cross-validation for Random-Forest does not automatically include ntree and nodesize. Therefore, ntree and nodesize parameters are fine-tuned manually using the following code.
 ```{r }
 set.seed(4)
-ntree <- seq(100, 130, 5) #Hold vector for ntree
-nodesize <- c(1,2,3) #Hold Vector for nodesize
+ntree <- seq(100, 130, 5) #Vector for ntree
+nodesize <- c(1,2,3) #Vector for nodesize
 exgrd <- expand.grid(ntree,nodesize) #Vector with all combinations of ntree and nodesize
-vec <- seq(1,nrow(exgrd)) #Index vector to sweep through exgrd vector using sapply
-acc <- sapply(vec, function(n){
+ind_vec <- seq(1,nrow(exgrd)) #Index vector to sweep through exgrd vector using sapply
+acc <- sapply(ind_vec, function(n){
   train(Disease ~., 
         data = train_set_transformed,
         method = "rf", 
         tuneGrid = data.frame(mtry = 1), 
         ntree = exgrd$Var1[n],
-        nodesize = exgrd$Var2[n])$results$Accuracy
+        nodesize = exgrd$Var2[n],
+        trControl = control)$results$Accuracy
 })
 opt_mtry <- 1
 opt_ntree <- exgrd$Var1[which.max(acc)] #Holds optimal ntree value
@@ -312,9 +336,11 @@ fit_rf <- train(Disease ~.,
                 method = "rf", 
                 tuneGrid = data.frame(mtry = opt_mtry), 
                 ntree = opt_ntree,
-                nodesize = opt_nodesize)
+                nodesize = opt_nodesize,
+                trControl = control)
 rf_validation_acc <- max(fit_rf$results$Accuracy) #Holds Random-Forest Validation Accuracy
 ```
+\newpage
 
 4. SVM with Radial Kernal
 
@@ -326,7 +352,8 @@ sigma <- seq(0.1, 2, 20)
 fit_svmRadial <- train(Disease ~.,
                   data = train_set_transformed,
                   method = "svmRadial", 
-                  tuneGrid = data.frame(C = C, sigma = sigma))
+                  tuneGrid = data.frame(C = C, sigma = sigma),
+                  trControl = control)
 svmRadial_validation_acc <- max(fit_svmRadial$results$Accuracy) #Holds Svm-Radial Validation Accuracy
 ```
 
@@ -337,7 +364,6 @@ rpart_validation_acc
 rf_validation_acc
 svmRadial_validation_acc
 ```
-\newpage
 
 ## 5. Results
 
@@ -353,6 +379,8 @@ We can now change the number of PCA components used during preprocessing and che
 We use the Random-Forest model built together with PCA based preprocessing with 8 components for testing and final results.
 
 The following code can be used to obtain and print accuracy, sensitivity, specificity, F1-score and other related metrices. 
+\newpage
+
 ```{r }
 Disease_hat_rf_test <- predict(fit_rf, test_set_transformed)
 cm <- confusionMatrix(Disease_hat_rf_test, test_set_transformed$Disease, positive = "1")
@@ -364,10 +392,9 @@ cm[["byClass"]][["Pos Pred Value"]]
 cm[["byClass"]][["Neg Pred Value"]]
 ```
 
-It can be observed that the prediction results in a high sensitivity but with a low specificity. This may be due to the Dataset imbalance. The Dataset consists of significantly more number of cases with liver disease than cases without liver disease. Therefore, the prediction algorithm is inherently biased towards positive cases, which results in higher sensitivity and a lower specificity.
+It can be observed that the prediction result has a high sensitivity but a low specificity. This may be due to the Dataset imbalance. The Dataset consists of significantly more number of cases with liver disease than cases without liver disease. Therefore, the prediction algorithm is inherently biased towards positive cases, which results in higher sensitivity and a lower specificity.
 
 The values "Pos Pred Value" and "Neg Pred Value" gives the probability of liver desease when the prediction is positive and the probability of no liver disease when the prediction is negative, respectively. Out of these probabilities "Neg Pred Value" is more important for this case due to medical reasons. It can be observed from the above values that "Neg Pred Value" (Probability of no liver disease when prediction is negative) is larger than 0.5, which suggests that the prediction algorithm works better than simple guess work.
-Since, the prediction of liver disease should be supportive for medical decisions, 
 
 ## 6. Conclusion
 
